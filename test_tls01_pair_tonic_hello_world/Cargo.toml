@@ -1,0 +1,25 @@
+[package]
+name = "attempt_at_client_server_tonic_tls"
+build = "build.rs"
+edition = "2021"
+
+[dependencies]
+prost = "0.13.2"
+tokio = { version = "1", features = ["full"] }
+tonic = { version = "0.12", features = ["tls", "codegen", "prost", "transport"] }
+rcgen = "0.9"
+
+[build-dependencies]
+tonic-build = { version = "0.12", features = ["prost", "transport"] }
+
+[[bin]]
+name = "create_key"
+path = "src/create_key.rs"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[[bin]]
+name = "client"
+path = "src/client.rs"
