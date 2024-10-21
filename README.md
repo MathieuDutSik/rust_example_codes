@@ -1,2 +1,4 @@
-# tls_example
-Examples of using TLS, rust and Tonic
+# Rust Example Codes
+This repository contains a number of Rust example codes that allow to investigate
+the behavior of Rust codes.
+
