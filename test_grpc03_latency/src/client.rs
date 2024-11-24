@@ -1,6 +1,6 @@
 use hello_world::greeter_client::GreeterClient;
 use hello_world::HelloRequest;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Endpoint;
 use core::time::Duration;
 use std::time::Instant;
 
@@ -11,10 +11,11 @@ mod hello_world {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let n = 1000;
+    let endpoint = "https://localhost:50052";
     //
     {
         println!("---- Cloning the already connected channel ----");
-        let endpoint = Endpoint::from_static("https://localhost:50052");
+        let endpoint = Endpoint::from_static(endpoint);
 
         let channel = endpoint.connect()
             .await
@@ -27,11 +28,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let start = Instant::now(); // Start the time
             let mut client = GreeterClient::new(channel.clone());
-
             let _response = client.say_hello(request).await?;
             let duration = start.elapsed(); // Measure the elapsed time
 
-//            println!("Response from server i={} duration={:?}", i, duration);
             total += duration;
         }
         println!("total={:?}", total);
@@ -39,7 +38,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     {
         println!("---- Cloning the connect_lazy channel ----");
-        let endpoint = Endpoint::from_static("https://localhost:50052");
+        let endpoint = Endpoint::from_static(endpoint);
 
         let channel = endpoint.connect_lazy();
 
@@ -51,11 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let start = Instant::now(); // Start the time
             let mut client = GreeterClient::new(channel.clone());
-
             let _response = client.say_hello(request).await?;
             let duration = start.elapsed(); // Measure the elapsed time
 
-//            println!("Response from server i={} duration={:?}", i, duration);
             total += duration;
         }
         println!("total={:?}", total);
@@ -65,7 +62,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("---- Creating the endpoint/channel and connect_lazy----");
         let mut total = Duration::default();
         for _i in 0..n {
-            let endpoint = Endpoint::from_static("https://localhost:50052");
+            let endpoint = Endpoint::from_static(endpoint);
             let channel = endpoint.connect_lazy();
 
             let request = tonic::Request::new(HelloRequest {
@@ -74,11 +71,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let start = Instant::now(); // Start the time
             let mut client = GreeterClient::new(channel);
-
             let _response = client.say_hello(request).await?;
             let duration = start.elapsed(); // Measure the elapsed time
 
-//            println!("Response from server i={} duration={:?}", i, duration);
             total += duration;
         }
         println!("total={:?}", total);
@@ -88,7 +83,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("---- Creating the endpoint/channel and connect----");
         let mut total = Duration::default();
         for _i in 0..n {
-            let endpoint = Endpoint::from_static("https://localhost:50052");
+            let endpoint = Endpoint::from_static(endpoint);
             let channel = endpoint.connect()
                 .await
                 .expect("a connected channel");
@@ -99,11 +94,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             let start = Instant::now(); // Start the time
             let mut client = GreeterClient::new(channel);
-
             let _response = client.say_hello(request).await?;
             let duration = start.elapsed(); // Measure the elapsed time
 
-//            println!("Response from server i={} duration={:?}", i, duration);
             total += duration;
         }
         println!("total={:?}", total);
@@ -111,7 +104,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     //
     {
         println!("---- Creating the Greeter from a connected channel and iterating over it ----");
-        let endpoint = Endpoint::from_static("https://localhost:50052");
+        let endpoint = Endpoint::from_static(endpoint);
 
         let channel = endpoint.connect()
             .await
