@@ -1,19 +1,16 @@
-use alloy_sol_types::sol;
-use alloy_sol_types::SolCall;
-
-use revm::Database;
-use revm::DatabaseCommit;
-use revm::DatabaseRef;
-use std::path::Path;
-use std::process::Command;
-use std::process::Stdio;
-
-use revm::db::InMemoryDB;
-use revm::{
-    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
-    Evm,
+use std::{
+    fs::File,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
 };
-use std::{fs::File, io::Write};
+
+use alloy_sol_types::{sol, SolCall};
+use revm::{
+    db::InMemoryDB,
+    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
+    Database, DatabaseCommit, DatabaseRef, Evm,
+};
 use tempfile::tempdir;
 
 pub fn write_compilation_json(path: &Path, file_name: &str) {
@@ -64,11 +61,6 @@ pub fn get_bytecode_path(
 
     let contents = std::fs::read_to_string(output_path)?;
     let json_data: serde_json::Value = serde_json::from_str(&contents)?;
-    println!("json_data={}", json_data);
-    println!();
-    println!();
-    println!();
-    println!();
     let contracts = json_data
         .get("contracts")
         .ok_or(anyhow::anyhow!("failed to get contract"))?;
