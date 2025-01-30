@@ -76,7 +76,7 @@ pub fn get_bytecode_path(
         .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get test"))?;
+        .ok_or(anyhow::anyhow!("failed to get {contract_name}"))?;
     let evm_data = test_data
         .get("evm")
         .ok_or(anyhow::anyhow!("failed to get evm"))?;
@@ -120,14 +120,7 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
         anyhow::bail!("The transact_commit failed");
     };
 
-    let ExecutionResult::Success {
-        reason: _,
-        gas_used: _,
-        gas_refunded: _,
-        logs: _,
-        output,
-    } = result
-    else {
+    let ExecutionResult::Success { output, .. } = result else {
         anyhow::bail!("Now getting Success");
     };
     let Output::Create(_, Some(contract_address)) = output else {

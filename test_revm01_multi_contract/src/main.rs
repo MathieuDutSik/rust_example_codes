@@ -61,15 +61,16 @@ pub fn get_bytecode_path(
 
     let contents = std::fs::read_to_string(output_path)?;
     let json_data: serde_json::Value = serde_json::from_str(&contents)?;
+    println!("json_data={:?}", json_data);
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contract"))?;
+        .ok_or(anyhow::anyhow!("failed to get contracts"))?;
     let file_name_contract = contracts
         .get(file_name)
         .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get test"))?;
+        .ok_or(anyhow::anyhow!("failed to get {contract_name}"))?;
     let evm_data = test_data
         .get("evm")
         .ok_or(anyhow::anyhow!("failed to get evm"))?;
@@ -86,6 +87,7 @@ pub fn get_bytecode_path(
 }
 
 pub fn get_bytecode(source_code: &str, contract_name: &str) -> anyhow::Result<Bytes> {
+    println!("source_code={source_code}");
     let dir = tempdir().unwrap();
     let path = dir.path();
     let file_name = "test_code.sol";
@@ -113,14 +115,7 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
         anyhow::bail!("The transact_commit failed");
     };
 
-    let ExecutionResult::Success {
-        reason: _,
-        gas_used: _,
-        gas_refunded: _,
-        logs: _,
-        output,
-    } = result
-    else {
+    let ExecutionResult::Success { output, .. } = result else {
         anyhow::bail!("Now getting Success");
     };
     let Output::Create(_, Some(contract_address)) = output else {
@@ -163,13 +158,16 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
 fn main() -> anyhow::Result<()> {
     let bytecode1 = {
         let source_code = r#"
-contract ExampleCodeFirst {{
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
-    function test_function_first(uint256 input) external {{
+contract ExampleCodeFirst {
+
+    function test_function_first(uint256 input) external {
       require(input == 2);
-    }}
+    }
 
-}}
+}
 "#
         .to_string();
         get_bytecode(&source_code, "ExampleCodeFirst")?
@@ -177,18 +175,21 @@ contract ExampleCodeFirst {{
 
     let bytecode2 = {
         let source_code = r#"
-interface IExternalContract {{
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+interface IExternalContract {
     function test_function_first(uint256 value) external;
-}}
+}
 
-contract ExampleCodeSecond {{
+contract ExampleCodeSecond {
 
-    function test_function_second(address contract_address1, uint256 input) external {{
+    function test_function_second(address contract_address1, uint256 input) external {
       IExternalContract externalContract = IExternalContract(contract_address1);
       externalContract.test_function_first(input);
-    }}
+    }
 
-}}
+}
 "#
         .to_string();
         get_bytecode(&source_code, "ExampleCodeSecond")?

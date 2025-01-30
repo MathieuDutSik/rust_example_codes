@@ -83,10 +83,7 @@ pub fn get_bytecode_path(
         .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!(
-            "failed to get contract_name={}",
-            contract_name
-        ))?;
+        .ok_or(anyhow::anyhow!("failed to get contract_name={contract_name}"))?;
     let evm_data = test_data
         .get("evm")
         .ok_or(anyhow::anyhow!("failed to get evm"))?;
@@ -130,14 +127,7 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
         anyhow::bail!("The transact_commit failed");
     };
 
-    let ExecutionResult::Success {
-        reason: _,
-        gas_used: _,
-        gas_refunded: _,
-        logs: _,
-        output,
-    } = result
-    else {
+    let ExecutionResult::Success { output, .. } = result else {
         anyhow::bail!("Now getting Success");
     };
     let Output::Create(_, Some(contract_address)) = output else {
@@ -223,18 +213,18 @@ fn main() -> anyhow::Result<()> {
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract PrecompileCaller {{
+contract PrecompileCaller {
 
-    function test_precompile(uint256 input) external {{
+    function test_precompile(uint256 input) external {
       address precompile = address(0x0b);
       bytes memory input_bytes = abi.encodePacked(input);
       (bool success, bytes memory result_bytes) = precompile.call(input_bytes);
       uint256 result = abi.decode(result_bytes, (uint256));
       require(success);
       require(result == 49);
-    }}
+    }
 
-}}
+}
 "#
         .to_string();
         get_bytecode(&source_code, "PrecompileCaller")?
