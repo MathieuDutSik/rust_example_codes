@@ -1,24 +1,23 @@
-use alloy_sol_types::sol;
-use alloy_sol_types::SolCall;
+use std::{
+    fs::File,
+    io::Write,
+    path::Path,
+    process::{Command, Stdio},
+};
+
 use alloy_primitives::Log;
-
-use std::process::Command;
-use std::process::Stdio;
-use std::path::Path;
-
+use alloy_sol_types::{sol, SolCall};
+use anyhow::Context;
 use revm::{
     db::InMemoryDB,
     inspector_handle_register,
-    primitives::{Address, ExecutionResult, TxKind, U256, Output, Bytes},
-    Database, DatabaseRef, DatabaseCommit,
-    Evm,
-    EvmContext,
-    Inspector,
+    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
+    Database, DatabaseCommit, DatabaseRef, Evm, EvmContext, Inspector,
 };
-use revm_interpreter::{CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter};
-use std::{fs::File, io::Write};
+use revm_interpreter::{
+    CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, Interpreter,
+};
 use tempfile::tempdir;
-
 
 #[derive(Default)]
 struct PrintInspector {
@@ -34,15 +33,15 @@ impl<DB: Database> Inspector<DB> for PrintInspector {
     }
 
     fn step(&mut self, interp: &mut Interpreter, context: &mut EvmContext<DB>) {
-//        self.n_call += 1;
-//        println!("PrintInspector: step");
+        //        self.n_call += 1;
+        //        println!("PrintInspector: step");
         let _ = interp;
         let _ = context;
     }
 
     fn step_end(&mut self, interp: &mut Interpreter, context: &mut EvmContext<DB>) {
-//        self.n_call += 1;
-//        println!("PrintInspector: step_end");
+        //        self.n_call += 1;
+        //        println!("PrintInspector: step_end");
         let _ = interp;
         let _ = context;
     }
@@ -55,7 +54,11 @@ impl<DB: Database> Inspector<DB> for PrintInspector {
         let _ = log;
     }
 
-    fn call(&mut self, _context: &mut EvmContext<DB>, _inputs: &mut CallInputs) -> Option<CallOutcome> {
+    fn call(
+        &mut self,
+        _context: &mut EvmContext<DB>,
+        _inputs: &mut CallInputs,
+    ) -> Option<CallOutcome> {
         self.n_call += 1;
         println!("PrintInspector: call");
         None
@@ -133,14 +136,6 @@ impl<DB: Database> Inspector<DB> for PrintInspector {
     }
 }
 
-
-
-
-
-
-
-
-
 pub fn write_compilation_json(path: &Path, file_name: &str) {
     let mut source = File::create(path).unwrap();
     writeln!(
@@ -167,7 +162,11 @@ pub fn write_compilation_json(path: &Path, file_name: &str) {
     .unwrap();
 }
 
-pub fn get_bytecode_path(path: &Path, file_name: &str, contract_name: &str) -> anyhow::Result<Bytes> {
+pub fn get_bytecode_path(
+    path: &Path,
+    file_name: &str,
+    contract_name: &str,
+) -> anyhow::Result<Bytes> {
     let config_path = path.join("config.json");
     write_compilation_json(&config_path, file_name);
     let config_file = File::open(config_path)?;
@@ -185,33 +184,25 @@ pub fn get_bytecode_path(path: &Path, file_name: &str, contract_name: &str) -> a
 
     let contents = std::fs::read_to_string(output_path)?;
     let json_data: serde_json::Value = serde_json::from_str(&contents)?;
-//    println!("json_data={}", json_data);
-//    println!();
+    //    println!("json_data={}", json_data);
+    //    println!();
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contract"))?;
+        .context("failed to get contract")?;
     let file_name_contract = contracts
         .get(file_name)
-        .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
+        .context("failed to get {file_name}")?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get {contract_name}"))?;
-    let evm_data = test_data
-        .get("evm")
-        .ok_or(anyhow::anyhow!("failed to get evm"))?;
-    let bytecode = evm_data
-        .get("bytecode")
-        .ok_or(anyhow::anyhow!("failed to get bytecode"))?;
-    let object = bytecode
-        .get("object")
-        .ok_or(anyhow::anyhow!("failed to get object"))?;
+        .context("failed to get {contract_name}")?;
+    let evm_data = test_data.get("evm").context("failed to get evm")?;
+    let bytecode = evm_data.get("bytecode").context("failed to get bytecode")?;
+    let object = bytecode.get("object").context("failed to get object")?;
     let object = object.to_string();
     let object = object.trim_matches(|c| c == '"').to_string();
     let object = hex::decode(&object)?;
     Ok(Bytes::copy_from_slice(&object))
 }
-
-
 
 pub fn get_bytecode(source_code: &str, contract_name: &str) -> anyhow::Result<Bytes> {
     let dir = tempdir().unwrap();
@@ -223,8 +214,10 @@ pub fn get_bytecode(source_code: &str, contract_name: &str) -> anyhow::Result<By
     get_bytecode_path(path, file_name, contract_name)
 }
 
-
-fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut DB, bytecode: Bytes) -> anyhow::Result<Address> {
+fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
+    database: &mut DB,
+    bytecode: Bytes,
+) -> anyhow::Result<Address> {
     let mut evm: Evm<'_, _, _> = Evm::builder()
         .with_ref_db(database)
         .with_external_context(PrintInspector::default())
@@ -249,8 +242,11 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut D
     Ok(contract_address)
 }
 
-
-fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut DB, contract_address: Address, encoded_args: Bytes) -> anyhow::Result<()> {
+fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
+    database: &mut DB,
+    contract_address: Address,
+    encoded_args: Bytes,
+) -> anyhow::Result<()> {
     let mut insp = PrintInspector::default();
     let mut evm: Evm<'_, _, _> = Evm::builder()
         .with_ref_db(database)
@@ -274,65 +270,59 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut 
     Ok(())
 }
 
-
-
-
-
-
 fn main() -> anyhow::Result<()> {
     let bytecode1 = {
-        let source_code = format!(
-            r#"
+        let source_code = r#"
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-contract ExampleCodeFirst {{
+contract ExampleCodeFirst {
 
-    function test_function_first(uint256 input) external {{
+    function test_function_first(uint256 input) external {
       require(input == 2);
-    }}
+    }
 
-}}
+}
 "#
-        );
+        .to_string();
         get_bytecode(&source_code, "ExampleCodeFirst")?
     };
 
     let bytecode2 = {
-        let source_code = format!(
-            r#"
+        let source_code = r#"
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-interface IExternalContract {{
+interface IExternalContract {
     function test_function_first(uint256 value) external;
-}}
+}
 
-contract ExampleCodeSecond {{
+contract ExampleCodeSecond {
 
-    function test_function_second(address contract_address1, uint256 input) external {{
+    function test_function_second(address contract_address1, uint256 input) external {
       IExternalContract externalContract = IExternalContract(contract_address1);
       externalContract.test_function_first(input);
-    }}
+    }
 
-}}
+}
 "#
-        );
+        .to_string();
         get_bytecode(&source_code, "ExampleCodeSecond")?
     };
-
 
     let mut database = InMemoryDB::default();
     let contract_address1 = deploy_contract(&mut database, bytecode1)?;
     let contract_address2 = deploy_contract(&mut database, bytecode2)?;
-
 
     sol! {
         function test_function_second(address contract_address, uint256 input);
     }
 
     let input = U256::from(2);
-    let fct_args = test_function_secondCall { contract_address: contract_address1, input };
+    let fct_args = test_function_secondCall {
+        contract_address: contract_address1,
+        input,
+    };
     let fct_args = fct_args.abi_encode().into();
 
     single_execution(&mut database, contract_address2, fct_args).unwrap();
@@ -340,4 +330,3 @@ contract ExampleCodeSecond {{
     println!("The single_execution has been successful");
     Ok(())
 }
-

@@ -1,20 +1,18 @@
-use std::{fs::File, io::Write};
 use std::{
+    fs::File,
+    io::Write,
+    path::Path,
     process::{Command, Stdio},
 };
 
 use alloy_sol_types::{sol, SolCall};
+use anyhow::Context;
 use core::ops::Range;
-
-use std::path::Path;
-
 use revm::{
     db::InMemoryDB,
-    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
-    Database, DatabaseCommit, DatabaseRef, Evm,
-    EvmContext,
-    Inspector,
     inspector_handle_register,
+    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
+    Database, DatabaseCommit, DatabaseRef, Evm, EvmContext, Inspector,
 };
 use revm_interpreter::{CallInputs, CallOutcome, Gas, InstructionResult, InterpreterResult};
 use tempfile::tempdir;
@@ -74,24 +72,16 @@ pub fn get_bytecode_path(
     println!();
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contracts"))?;
+        .context("failed to get contracts")?;
     let file_name_contract = contracts
         .get(file_name)
-        .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
+        .context("failed to get {file_name}")?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!(
-            "failed to get contract_name={contract_name}",
-        ))?;
-    let evm_data = test_data
-        .get("evm")
-        .ok_or(anyhow::anyhow!("failed to get evm"))?;
-    let bytecode = evm_data
-        .get("bytecode")
-        .ok_or(anyhow::anyhow!("failed to get bytecode"))?;
-    let object = bytecode
-        .get("object")
-        .ok_or(anyhow::anyhow!("failed to get object"))?;
+        .context("failed to get contract_name={contract_name}")?;
+    let evm_data = test_data.get("evm").context("failed to get evm")?;
+    let bytecode = evm_data.get("bytecode").context("failed to get bytecode")?;
+    let object = bytecode.get("object").context("failed to get object")?;
     let object = object.to_string();
     let object = object.trim_matches(|c| c == '"').to_string();
     let object = hex::decode(&object)?;
@@ -127,7 +117,7 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
     };
 
     let ExecutionResult::Success { output, .. } = result else {
-         anyhow::bail!("Now getting Success");
+        anyhow::bail!("Now getting Success");
     };
     let Output::Create(_, Some(contract_address)) = output else {
         anyhow::bail!("The Output::Create function");
@@ -135,9 +125,11 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
     Ok(contract_address)
 }
 
-
-
-fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut DB, contract_address: Address, encoded_args: Bytes) -> anyhow::Result<CallOutcome> {
+fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
+    database: &mut DB,
+    contract_address: Address,
+    encoded_args: Bytes,
+) -> anyhow::Result<CallOutcome> {
     let mut evm: Evm<'_, (), _> = Evm::builder()
         .with_ref_db(database)
         .modify_tx_env(|tx| {
@@ -154,27 +146,53 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(database: &mut 
     let memory_offset = Range::default();
     let gas = Gas::new(1000000);
     let result = match result {
-        ExecutionResult::Success { reason, gas_used, gas_refunded, logs: _, output } => {
+        ExecutionResult::Success {
+            reason,
+            gas_used: _,
+            gas_refunded: _,
+            logs: _,
+            output,
+        } => {
             let result: InstructionResult = reason.into();
             let Output::Call(output) = output else {
                 anyhow::bail!("The Output is not a call which is impossible");
             };
-            InterpreterResult { result, output, gas }
-        },
-        ExecutionResult::Revert { gas_used, output } => {
+            InterpreterResult {
+                result,
+                output,
+                gas,
+            }
+        }
+        ExecutionResult::Revert {
+            gas_used: _,
+            output,
+        } => {
             let result = InstructionResult::Revert;
-            InterpreterResult { result, output, gas }
-        },
-        ExecutionResult::Halt { reason, gas_used } => {
+            InterpreterResult {
+                result,
+                output,
+                gas,
+            }
+        }
+        ExecutionResult::Halt {
+            reason,
+            gas_used: _,
+        } => {
             let result = reason.into();
             let output = Bytes::default();
-            InterpreterResult { result, output, gas }
-        },
+            InterpreterResult {
+                result,
+                output,
+                gas,
+            }
+        }
     };
-    let call_outcome = CallOutcome { result, memory_offset };
+    let call_outcome = CallOutcome {
+        result,
+        memory_offset,
+    };
     Ok(call_outcome)
 }
-
 
 struct CallInterceptor {
     is_first: bool,
@@ -186,10 +204,12 @@ impl Default for CallInterceptor {
     }
 }
 
-
 impl<DB: Database> Inspector<DB> for CallInterceptor {
-
-    fn call(&mut self, _context: &mut EvmContext<DB>, inputs: &mut CallInputs) -> Option<CallOutcome> {
+    fn call(
+        &mut self,
+        _context: &mut EvmContext<DB>,
+        inputs: &mut CallInputs,
+    ) -> Option<CallOutcome> {
         println!("Passing by CallInterceptor::call");
 
         if self.is_first {
@@ -227,7 +247,6 @@ impl<DB: Database> Inspector<DB> for CallInterceptor {
 // So, yes, bytes in input, bytes in output, but a lot more than that.
 //
 
-
 fn evaluate_contract1(fct_args: Bytes) -> anyhow::Result<CallOutcome> {
     let bytecode = {
         let source_code = r#"
@@ -241,7 +260,8 @@ contract ExampleCodeFirst {
     return retval;
   }
 }
-"#.to_string();
+"#
+        .to_string();
         get_bytecode(&source_code, "ExampleCodeFirst")?
     };
 
@@ -250,9 +270,6 @@ contract ExampleCodeFirst {
 
     single_execution(&mut database, contract_address, fct_args)
 }
-
-
-
 
 fn main() -> anyhow::Result<()> {
     let bytecode2 = {
@@ -274,11 +291,10 @@ contract ExampleCallInterceptor {
   }
 
 }
-"#.to_string();
+"#
+        .to_string();
         get_bytecode(&source_code, "ExampleCallInterceptor")?
     };
-
-
 
     let mut database = InMemoryDB::default();
     let contract_address = deploy_contract(&mut database, bytecode2)?;
@@ -290,7 +306,6 @@ contract ExampleCallInterceptor {
     let input = U256::from(7);
     let fct_args = test_call_interceptorCall { input };
     let fct_args = fct_args.abi_encode().into();
-
 
     let mut insp = CallInterceptor::default();
     let mut evm: Evm<'_, _, _> = Evm::builder()
