@@ -1,16 +1,17 @@
 use std::{
     collections::HashMap,
+    fs::File,
+    io::Write,
     path::Path,
     process::{Command, Stdio},
-    fs::File, io::Write,
 };
 
 use alloy_sol_types::{sol, SolCall};
+use anyhow::Context;
 use revm::{
     db::InMemoryDB,
     primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
-    Evm,
-    Database, DatabaseCommit, DatabaseRef,
+    Database, DatabaseCommit, DatabaseRef, Evm,
 };
 use tempfile::tempdir;
 
@@ -70,24 +71,18 @@ pub fn get_bytecode_path(
     println!();
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contract"))?;
+        .context("failed to get contract")?;
     let file_name_contract = contracts
         .get(file_name)
-        .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
+        .context("failed to get {file_name}")?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get {contract_name}"))?;
-    let evm_data = test_data
-        .get("evm")
-        .ok_or(anyhow::anyhow!("failed to get evm"))?;
+        .context("failed to get {contract_name}")?;
+    let evm_data = test_data.get("evm").context("failed to get evm")?;
     println!("get_bytecode_path evm_data={}", evm_data);
-    let bytecode = evm_data
-        .get("bytecode")
-        .ok_or(anyhow::anyhow!("failed to get bytecode"))?;
+    let bytecode = evm_data.get("bytecode").context("failed to get bytecode")?;
     println!("get_bytecode_path bytecode={}", bytecode);
-    let object = bytecode
-        .get("object")
-        .ok_or(anyhow::anyhow!("failed to get object"))?;
+    let object = bytecode.get("object").context("failed to get object")?;
     println!("get_bytecode_path 1: object={}", object);
     let object = object.to_string();
     println!("get_bytecode_path 2: object={}", object);

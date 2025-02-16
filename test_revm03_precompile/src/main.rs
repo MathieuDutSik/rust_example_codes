@@ -1,21 +1,21 @@
-use std::{fs::File, io::Write};
 use std::{
+    fs::File,
+    io::Write,
+    path::Path,
     process::{Command, Stdio},
     sync::Arc,
 };
 
 use alloy_sol_types::{sol, SolCall, SolValue};
-
-use revm_precompile::{PrecompileOutput, PrecompileResult};
-use revm_primitives::address;
-use std::path::Path;
-
-use revm::db::InMemoryDB;
+use anyhow::Context;
 use revm::{
+    db::InMemoryDB,
     primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
     ContextPrecompile, ContextStatefulPrecompile, Database, DatabaseCommit, DatabaseRef, Evm,
     InnerEvmContext,
 };
+use revm_precompile::{PrecompileOutput, PrecompileResult};
+use revm_primitives::address;
 use tempfile::tempdir;
 
 fn precompile_address() -> Address {
@@ -77,22 +77,16 @@ pub fn get_bytecode_path(
     println!();
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contract"))?;
+        .context("failed to get contract")?;
     let file_name_contract = contracts
         .get(file_name)
-        .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
+        .context("failed to get {file_name}")?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get contract_name={contract_name}"))?;
-    let evm_data = test_data
-        .get("evm")
-        .ok_or(anyhow::anyhow!("failed to get evm"))?;
-    let bytecode = evm_data
-        .get("bytecode")
-        .ok_or(anyhow::anyhow!("failed to get bytecode"))?;
-    let object = bytecode
-        .get("object")
-        .ok_or(anyhow::anyhow!("failed to get object"))?;
+        .context("failed to get contract_name={contract_name}")?;
+    let evm_data = test_data.get("evm").context("failed to get evm")?;
+    let bytecode = evm_data.get("bytecode").context("failed to get bytecode")?;
+    let object = bytecode.get("object").context("failed to get object")?;
     let object = object.to_string();
     let object = object.trim_matches(|c| c == '"').to_string();
     let object = hex::decode(&object)?;

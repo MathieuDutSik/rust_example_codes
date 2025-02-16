@@ -6,6 +6,7 @@ use std::{
 };
 
 use alloy_sol_types::{sol, SolCall};
+use anyhow::Context;
 use revm::{
     db::InMemoryDB,
     primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
@@ -64,22 +65,16 @@ pub fn get_bytecode_path(
     println!("json_data={:?}", json_data);
     let contracts = json_data
         .get("contracts")
-        .ok_or(anyhow::anyhow!("failed to get contracts"))?;
+        .context("failed to get contracts")?;
     let file_name_contract = contracts
         .get(file_name)
-        .ok_or(anyhow::anyhow!("failed to get {file_name}"))?;
+        .context("failed to get {file_name}")?;
     let test_data = file_name_contract
         .get(contract_name)
-        .ok_or(anyhow::anyhow!("failed to get {contract_name}"))?;
-    let evm_data = test_data
-        .get("evm")
-        .ok_or(anyhow::anyhow!("failed to get evm"))?;
-    let bytecode = evm_data
-        .get("bytecode")
-        .ok_or(anyhow::anyhow!("failed to get bytecode"))?;
-    let object = bytecode
-        .get("object")
-        .ok_or(anyhow::anyhow!("failed to get object"))?;
+        .context("failed to get {contract_name}")?;
+    let evm_data = test_data.get("evm").context("failed to get evm")?;
+    let bytecode = evm_data.get("bytecode").context("failed to get bytecode")?;
+    let object = bytecode.get("object").context("failed to get object")?;
     let object = object.to_string();
     let object = object.trim_matches(|c| c == '"').to_string();
     let object = hex::decode(&object)?;
