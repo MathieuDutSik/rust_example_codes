@@ -6,10 +6,10 @@ edition = "2021"
 alloy-sol-types = "0.8.18"
 anyhow = "1.0.80"
 hex = "0.4.3"
-revm = "19.2.0"
-revm-precompile = "16.0.0"
-revm-primitives = "15.1.0"
-revm-interpreter = { version = "15.1.0", features = [ "serde" ] }
+revm = "19.7.0"
+revm-precompile = "16.2.0"
+revm-primitives = "15.2.0"
+revm-interpreter = { version = "15.2.0", features = [ "serde" ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.111"
 tempfile = "3.2.0"
