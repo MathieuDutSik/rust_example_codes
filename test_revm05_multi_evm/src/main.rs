@@ -7,7 +7,6 @@ use std::{
 
 use alloy_sol_types::{sol, SolCall};
 use anyhow::Context;
-use core::ops::Range;
 use revm::{
     db::InMemoryDB,
     inspector_handle_register,
@@ -129,7 +128,7 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
     database: &mut DB,
     contract_address: Address,
     encoded_args: Bytes,
-) -> anyhow::Result<CallOutcome> {
+) -> anyhow::Result<InterpreterResult> {
     let mut evm: Evm<'_, (), _> = Evm::builder()
         .with_ref_db(database)
         .modify_tx_env(|tx| {
@@ -143,9 +142,8 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
         anyhow::bail!("The transact_commit failed");
     };
 
-    let memory_offset = Range::default();
     let gas = Gas::new(1000000);
-    let result = match result {
+    match result {
         ExecutionResult::Success {
             reason,
             gas_used: _,
@@ -157,41 +155,16 @@ fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
             let Output::Call(output) = output else {
                 anyhow::bail!("The Output is not a call which is impossible");
             };
-            InterpreterResult {
+            Ok(InterpreterResult {
                 result,
                 output,
                 gas,
-            }
+            })
         }
-        ExecutionResult::Revert {
-            gas_used: _,
-            output,
-        } => {
-            let result = InstructionResult::Revert;
-            InterpreterResult {
-                result,
-                output,
-                gas,
-            }
-        }
-        ExecutionResult::Halt {
-            reason,
-            gas_used: _,
-        } => {
-            let result = reason.into();
-            let output = Bytes::default();
-            InterpreterResult {
-                result,
-                output,
-                gas,
-            }
-        }
-    };
-    let call_outcome = CallOutcome {
-        result,
-        memory_offset,
-    };
-    Ok(call_outcome)
+        _ => {
+            anyhow::bail!("The ExecutionResult should be Success");
+        },
+    }
 }
 
 struct CallInterceptor {
@@ -217,37 +190,19 @@ impl<DB: Database> Inspector<DB> for CallInterceptor {
             None
         } else {
             let fct_args = inputs.input.clone();
-            let mut call_outcome = evaluate_contract1(fct_args).unwrap();
-            call_outcome.memory_offset = inputs.return_memory_offset.clone();
+            let result = evaluate_contract1(fct_args).unwrap();
+
+            let call_outcome = CallOutcome {
+                result,
+                memory_offset: inputs.return_memory_offset.clone(),
+            };
             println!("call_outcome={call_outcome:?}");
             Some(call_outcome)
         }
     }
-
-    fn call_end(
-        &mut self,
-        context: &mut EvmContext<DB>,
-        inputs: &CallInputs,
-        outcome: CallOutcome,
-    ) -> CallOutcome {
-        let _ = context;
-        let _ = inputs;
-        outcome
-    }
 }
 
-// We have CallOutcome = InterpreterResult + memory_offset
-// Itself, we have InterpreterResult = InstructionResult + Output(Bytes) + gas
-// InstructionResult contains the various bad thing that can happen while
-// executing the code.
-//
-// Also, we have
-// CallInputs = Bytes(input) + return_memory_offset + bytecode_address
-//       + target_address + caller + value + scheme(WTF?) + is_static + is_eof
-// So, yes, bytes in input, bytes in output, but a lot more than that.
-//
-
-fn evaluate_contract1(fct_args: Bytes) -> anyhow::Result<CallOutcome> {
+fn evaluate_contract1(fct_args: Bytes) -> anyhow::Result<InterpreterResult> {
     let bytecode = {
         let source_code = r#"
 // SPDX-License-Identifier: MIT
@@ -327,6 +282,6 @@ contract ExampleCallInterceptor {
     let ExecutionResult::Success { .. } = result else {
         anyhow::bail!("Execution did not work out")
     };
-    println!("The single_execution has been successful");
+    println!("The inspector redirection has been successful");
     Ok(())
 }
