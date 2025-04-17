@@ -1,0 +1,26 @@
+[package]
+name = "test_multi_contract"
+edition = "2021"
+
+[dependencies]
+alloy-sol-types = "0.8.18"
+anyhow = "1.0.80"
+hex = "0.4.3"
+revm = "22.0.1"
+revm-bytecode = "3.0.0"
+revm-context = "3.0.0"
+revm-database = "3.0.0"
+revm-database-interface = "3.0.0"
+revm-handler = "3.0.0"
+revm-interpreter = { version = "18.0.0", features = ["serde"] }
+revm-inspector = "3.0.0"
+revm-precompile = "19.0.0"
+revm-primitives = "18.0.0"
+revm-state = "3.0.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.111"
+tempfile = "3.2.0"
+
+[[bin]]
+name = "main_contract_test"
+path = "src/main.rs"
