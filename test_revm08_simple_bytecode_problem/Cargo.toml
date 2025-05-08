@@ -7,6 +7,17 @@ alloy-sol-types = "0.8.18"
 anyhow = "1.0.80"
 hex = "0.4.3"
 revm = "23.1.0"
+revm-bytecode = "4.0.0"
+revm-context = "4.1.0"
+revm-database = "4.0.0"
+revm-database-interface = "4.0.0"
+revm-handler = "4.1.0"
+revm-interpreter = { version = "19.1.0", features = ["serde"] }
+revm-inspector = "4.1.0"
+revm-precompile = "20.1.0"
+revm-primitives = "19.0.0"
+revm-state = "4.0.0"
+
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.111"
 tempfile = "3.2.0"

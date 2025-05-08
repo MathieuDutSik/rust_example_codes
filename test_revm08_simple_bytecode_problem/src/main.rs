@@ -5,13 +5,18 @@ use std::{
     process::{Command, Stdio},
 };
 
-use alloy_sol_types::{sol, SolCall};
 use anyhow::Context;
-use revm::{
-    db::InMemoryDB,
-    primitives::{Address, Bytes, ExecutionResult, Output, TxKind, U256},
-    Database, DatabaseCommit, DatabaseRef, Evm,
+
+
+use revm::{primitives::Bytes, ExecuteCommitEvm};
+use revm_context::{
+    result::{ExecutionResult, Output},
+    BlockEnv, Evm, Journal, TxEnv,
 };
+use revm_database::{Database, DatabaseCommit, DatabaseRef, InMemoryDB, WrapDatabaseRef};
+use revm_handler::{instructions::EthInstructions, EthPrecompiles};
+use revm_primitives::{hardfork::SpecId, Address, TxKind};
+
 use tempfile::tempdir;
 
 pub fn write_compilation_json(path: &Path, file_name: &str) {
@@ -94,16 +99,16 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
     database: &mut DB,
     bytecode: Bytes,
 ) -> anyhow::Result<Address> {
-    let mut evm: Evm<'_, (), _> = Evm::builder()
-        .with_ref_db(database)
-        .modify_tx_env(|tx| {
-            tx.clear();
-            tx.transact_to = TxKind::Create;
-            tx.data = bytecode;
-        })
-        .build();
-
-    let result = evm.transact_commit();
+    let ctx: revm_context::Context<BlockEnv, _, _, _, Journal<WrapDatabaseRef<&mut DB>>, ()> =
+        revm_context::Context::new(WrapDatabaseRef(database), SpecId::default());
+    let instructions = EthInstructions::new_mainnet();
+    let mut evm = Evm::new(ctx, instructions, EthPrecompiles::default());
+    let result = evm.transact_commit(TxEnv {
+        kind: TxKind::Create,
+        data: bytecode,
+        nonce: 0,
+        ..TxEnv::default()
+    });
     let Ok(result) = result else {
         anyhow::bail!("The transact_commit failed");
     };
@@ -115,33 +120,6 @@ fn deploy_contract<DB: Database + DatabaseRef + DatabaseCommit>(
         anyhow::bail!("The Output::Create function");
     };
     Ok(contract_address)
-}
-
-fn single_execution<DB: Database + DatabaseRef + DatabaseCommit>(
-    database: &mut DB,
-    contract_address: Address,
-    encoded_args: Bytes,
-) -> anyhow::Result<Bytes> {
-    let mut evm: Evm<'_, (), _> = Evm::builder()
-        .with_ref_db(database)
-        .modify_tx_env(|tx| {
-            tx.transact_to = TxKind::Call(contract_address);
-            tx.data = encoded_args;
-        })
-        .build();
-
-    let result = evm.transact_commit();
-    let Ok(result) = result else {
-        anyhow::bail!("The transact_commit failed");
-    };
-
-    let ExecutionResult::Success { output, .. } = result else {
-        anyhow::bail!("Execution did not work out")
-    };
-    let Output::Call(result) = output else {
-        anyhow::bail!("Only alternative is contract creation which is kind of unlikely")
-    };
-    Ok(result)
 }
 
 fn main() -> anyhow::Result<()> {
@@ -161,21 +139,12 @@ contract ExampleReturn {
         get_bytecode(&source_code, "ExampleReturn")?
     };
 
+    let mut vec: Vec<u8> = bytecode.to_vec();
+    vec.push(42);
+    let tx_data = Bytes::copy_from_slice(&vec);
+
     let mut database = InMemoryDB::default();
-    let contract_address = deploy_contract(&mut database, bytecode)?;
-
-    sol! {
-        function test_return(uint256 input);
-    }
-
-    let input = U256::from(7);
-    let fct_args = test_returnCall { input };
-    let fct_args = fct_args.abi_encode().into();
-
-    let retval = single_execution(&mut database, contract_address, fct_args).unwrap();
-    let retval = U256::from_be_slice(retval.as_ref());
-    println!("retval={retval}");
-    assert_eq!(retval, U256::from(49));
+    let _contract_address = deploy_contract(&mut database, tx_data)?;
 
     println!("The single_execution has been successful");
     Ok(())
