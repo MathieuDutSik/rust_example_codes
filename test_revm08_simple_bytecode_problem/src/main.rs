@@ -141,10 +141,10 @@ contract ExampleReturn {
 
     let mut vec: Vec<u8> = bytecode.to_vec();
     vec.push(42);
-    let tx_data = Bytes::copy_from_slice(&vec);
+    let bytecode = Bytes::copy_from_slice(&vec);
 
     let mut database = InMemoryDB::default();
-    let _contract_address = deploy_contract(&mut database, tx_data)?;
+    let _contract_address = deploy_contract(&mut database, bytecode)?;
 
     println!("The single_execution has been successful");
     Ok(())
